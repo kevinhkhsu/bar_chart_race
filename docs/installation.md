@@ -15,6 +15,9 @@ After installation, ensure that `ffmpeg` has been added to your path by going to
 
 If you desire to create animated gifs, you'll need to [install ImageMagick][1]. Verify that it has been added to your path with `magick -version`.
 
+For Mac users:
+`brew install imagemagick`
+
 ## Dependencies
 
 Bar Chart Race requires that you have both matplotlib and pandas installed.

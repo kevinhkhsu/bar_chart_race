@@ -1,9 +1,10 @@
-# Bar Chart Race
+# Bar Chart Race With Image Labels
 
 [![](https://img.shields.io/pypi/v/bar_chart_race)](https://pypi.org/project/bar_chart_race)
 [![PyPI - License](https://img.shields.io/pypi/l/bar_chart_race)](LICENSE)
 
 Make animated bar and line chart races in Python with matplotlib or plotly.
+\* Added support to include image labels for `bar_chart_race` function (as shown below)
 
 ![img](https://github.com/dexplo/bar_chart_race/raw/gh-pages/images/covid19_horiz.gif)
 
@@ -15,8 +16,7 @@ Visit the [bar_chart_race official documentation](https://www.dexplo.org/bar_cha
 
 Install with either:
 
-* `pip install bar_chart_race`
-* `conda install -c conda-forge bar_chart_race`
+* `pip install git+https://github.com/kevinhkhsu/bar_chart_race.git`
 
 ## Quickstart
 
@@ -45,7 +45,8 @@ import bar_chart_race as bcr
 df = bcr.load_dataset('covid19_tutorial')
 bcr.bar_chart_race(
         df=df, 
-        filename='../docs/images/covid19_horiz.gif', 
+        filename='covid19_horiz.gif',
+        im_folder = 'images', # folder name of all image files
         orientation='h', 
         sort='desc', 
         n_bars=8, 
@@ -64,7 +65,7 @@ bcr.bar_chart_race(
         colors='dark12', 
         title='COVID-19 Deaths by Country', 
         bar_size=.95, 
-        bar_textposition='inside',
+        bar_textposition='outside',
         bar_texttemplate='{x:,.0f}', 
         bar_label_font=7, 
         tick_label_font=7, 

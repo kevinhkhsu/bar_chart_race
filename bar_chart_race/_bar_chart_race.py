@@ -10,15 +10,21 @@ from matplotlib.colors import Colormap
 from ._common_chart import CommonChart
 from ._utils import prepare_wide_data
 
+from matplotlib.offsetbox import TextArea, OffsetImage, AnnotationBbox
+from PIL import Image
+import os
+import glob
+
 class _BarChartRace(CommonChart):
     
-    def __init__(self, df, filename, orientation, sort, n_bars, fixed_order, fixed_max,
+    def __init__(self, df, filename, im_folder, orientation, sort, n_bars, fixed_order, fixed_max,
                  steps_per_period, period_length, end_period_pause, interpolate_period, 
                  period_label, period_template, period_summary_func, perpendicular_bar_func, 
                  colors, title, bar_size, bar_textposition, bar_texttemplate, bar_label_font, 
                  tick_label_font, tick_template, shared_fontdict, scale, fig, writer, 
                  bar_kwargs, fig_kwargs, filter_column_colors):
         self.filename = filename
+        self.im_folder = im_folder
         self.extension = self.get_extension()
         self.orientation = orientation
         self.sort = sort
@@ -236,7 +242,7 @@ class _BarChartRace(CommonChart):
     def get_max_plotted_value(self):
         plotted_values = []
         for i in range(len(self.df_values)):
-            _, bar_length, _, _ = self.get_bar_info(i)
+            _, bar_length, _, _, _ = self.get_bar_info(i)
             plotted_values.append(max(bar_length))
         return max(plotted_values)
 
@@ -269,7 +275,7 @@ class _BarChartRace(CommonChart):
         fig = plt.Figure(**self.fig_kwargs)
         ax = fig.add_subplot()
         plot_func = ax.barh if self.orientation == 'h' else ax.bar
-        bar_location, bar_length, cols, _ = self.get_bar_info(-1)
+        bar_location, bar_length, cols, _, _ = self.get_bar_info(-1)
         plot_func(bar_location, bar_length, tick_label=cols)
                 
         self.prepare_axes(ax)
@@ -338,7 +344,8 @@ class _BarChartRace(CommonChart):
         bar_length = self.df_values.iloc[i].values[top_filt]
         cols = self.df_values.columns[top_filt]
         colors = self.bar_colors[top_filt]
-        return bar_location, bar_length, cols, colors
+        names = self.df_ranks.iloc[i][top_filt].index.to_list()
+        return bar_location, bar_length, cols, colors, names
 
     def set_major_formatter(self, ax):
         if self.tick_template:
@@ -346,7 +353,7 @@ class _BarChartRace(CommonChart):
             axis.set_major_formatter(self.tick_template)
 
     def plot_bars(self, ax, i):
-        bar_location, bar_length, cols, colors = self.get_bar_info(i)
+        bar_location, bar_length, cols, colors, names = self.get_bar_info(i)
         if self.orientation == 'h':
             ax.barh(bar_location, bar_length, tick_label=cols, 
                     color=colors, **self.bar_kwargs)
@@ -371,6 +378,9 @@ class _BarChartRace(CommonChart):
         self.add_period_summary(ax, i)
         self.add_bar_labels(ax, bar_location, bar_length)
         self.add_perpendicular_bar(ax, bar_length, i)
+
+        if self.im_folder is not None:
+            self.add_image_labels(ax, bar_location, bar_length, names)
 
     def add_period_label(self, ax, i):
         if self.period_label:
@@ -430,6 +440,44 @@ class _BarChartRace(CommonChart):
                 text_objs.append(text_obj)
             return text_objs
 
+    def add_image_labels(self, ax, bar_location, bar_length, names):
+        bar_imageposition = 'outside' if self.bar_textposition == 'inside' else 'inside'
+
+        barx1, bary1 = ax.transData.transform((0, 0))
+        barx2, bary2 = ax.transData.transform((1, 1))
+        if self.orientation == 'h':
+            zipped = zip(bar_length, bar_location, names)
+            diff = bary2-bary1
+        else:
+            zipped = zip(bar_location, bar_length, names)
+            bar1, _ = ax.transData.transform((0, 0))
+            bar2, _ = ax.transData.transform((1, 0))
+            diff = barx2-barx1
+
+        size=int(diff*self.bar_size*72/self.fig_kwargs['dpi'])
+        delta = diff/2 if bar_imageposition == 'outside' else -diff/2
+
+        text_objs = []
+        for x1, y1, name1 in zipped:
+            im_pth = glob.glob(f'{self.im_folder}/{name1}.*')
+            if im_pth:
+                img = Image.open(im_pth[0]).convert('RGBA')
+                img.thumbnail((200,200),Image.ANTIALIAS)
+
+                im = OffsetImage(img,zoom=size/200)
+                im.image.axes = ax
+
+                ximage, yimage = ax.transData.transform((x1, y1))
+                if self.orientation == 'h':
+                    ximage += delta
+                else:
+                    yimage += delta
+                ximage, yimage = ax.transData.inverted().transform((ximage, yimage))
+                ab = AnnotationBbox(im,(ximage,yimage,),xybox=(0.,0.),frameon=False,xycoords='data',
+                                    boxcoords='offset points',pad=0)
+
+                ax.add_artist(ab)
+
     def add_perpendicular_bar(self, ax, bar_length, i):
         if self.perpendicular_bar_func:
             if isinstance(self.perpendicular_bar_func, str):
@@ -460,6 +508,8 @@ class _BarChartRace(CommonChart):
         start = int(bool(self.period_label))
         for text in ax.texts[start:]:
             text.remove()
+        while ax.artists:
+            ax.artists[0].remove()
         self.plot_bars(ax, i)
         
     def make_animation(self):
@@ -498,6 +548,7 @@ class _BarChartRace(CommonChart):
                 fc = self.fig.get_facecolor()
                 if fc == (1, 1, 1, 0):
                     fc = 'white'
+
                 ret_val = anim.save(self.filename, fps=self.fps, writer=self.writer, 
                                     savefig_kwargs=savefig_kwargs) 
         except Exception as e:
@@ -509,7 +560,7 @@ class _BarChartRace(CommonChart):
         return ret_val
 
 
-def bar_chart_race(df, filename=None, orientation='h', sort='desc', n_bars=None, 
+def bar_chart_race(df, filename=None, im_folder=None, im_ext='jpeg', orientation='h', sort='desc', n_bars=None, 
                    fixed_order=False, fixed_max=False, steps_per_period=10, 
                    period_length=500, end_period_pause=0, interpolate_period=False, 
                    period_label=True, period_template=None, period_summary_func=None,
@@ -544,6 +595,12 @@ def bar_chart_race(df, filename=None, orientation='h', sort='desc', n_bars=None,
         If `None` return animation as an HTML5 string. If a string, save 
         animation to that filename location. Use .mp4, .gif, .html, .mpeg, 
         .mov or any other extensions supported by ffmpeg or ImageMagick.
+    
+    im_folder : `None` or str, default None
+        If `None`, no images are used. If a string, it is provided as the
+        folder to the images referencing the data. Each image should be 
+        named the same as the data category names in df with image extensions
+        supported to be opened by PIL.
 
     orientation : 'h' or 'v', default 'h'
         Bar orientation - horizontal or vertical
@@ -867,7 +924,7 @@ def bar_chart_race(df, filename=None, orientation='h', sort='desc', n_bars=None,
         'medium', 'large', 'x-large', 'xx-large', 'smaller', 'larger'
     These sizes are relative to plt.rcParams['font.size'].
     '''
-    bcr = _BarChartRace(df, filename, orientation, sort, n_bars, fixed_order, fixed_max,
+    bcr = _BarChartRace(df, filename, im_folder, orientation, sort, n_bars, fixed_order, fixed_max,
                         steps_per_period, period_length, end_period_pause, interpolate_period, 
                         period_label, period_template, period_summary_func, perpendicular_bar_func,
                         colors, title, bar_size, bar_textposition, bar_texttemplate, 
