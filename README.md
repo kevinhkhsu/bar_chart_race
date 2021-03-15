@@ -4,6 +4,7 @@
 [![PyPI - License](https://img.shields.io/pypi/l/bar_chart_race)](LICENSE)
 
 Make animated bar and line chart races in Python with matplotlib or plotly.
+
 \* Added support to include image labels for `bar_chart_race` function (as shown below)
 
 ![img](docs/images/covid19_horiz.gif)
@@ -14,7 +15,7 @@ Visit the [bar_chart_race official documentation](https://www.dexplo.org/bar_cha
 
 ## Installation
 
-* `pip install git+https://github.com/kevinhkhsu/bar_chart_race.git`
+* `pip install git+https://github.com/kevinhkhsu/bar_chart_race`
 
 ## Quickstart
 
