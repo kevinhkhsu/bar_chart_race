@@ -239,12 +239,13 @@ class _BarChartRace(CommonChart):
                                     "To reduce color repetition, set `filter_column_colors` to `True`")
         return bar_colors
 
-    def get_max_plotted_value(self):
+    def get_max_plotted_value_idx(self):
         plotted_values = []
         for i in range(len(self.df_values)):
             _, bar_length, _, _, _ = self.get_bar_info(i)
             plotted_values.append(max(bar_length))
-        return max(plotted_values)
+
+        return np.argmax(plotted_values)
 
     def prepare_axes(self, ax):
         value_axis = ax.xaxis if self.orientation == 'h' else ax.yaxis
@@ -277,7 +278,10 @@ class _BarChartRace(CommonChart):
         plot_func = ax.barh if self.orientation == 'h' else ax.bar
         bar_location, bar_length, cols, _, _ = self.get_bar_info(-1)
         plot_func(bar_location, bar_length, tick_label=cols)
-                
+        
+        max_idx = self.get_max_plotted_value_idx()
+        bar_location, bar_length, _, _, _ = self.get_bar_info(max_idx)
+
         self.prepare_axes(ax)
         texts = self.add_bar_labels(ax, bar_location, bar_length)
 
